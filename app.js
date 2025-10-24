@@ -18,21 +18,68 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('express-async-errors');
 
-// Import configuration and utilities
-const config = require('./config/environment');
-const logger = require('./src/utils/logger');
-const apiResponse = require('./src/utils/apiResponse');
-
-// Import middleware
-const errorHandler = require('./src/middleware/errorHandler');
-const corsMiddleware = require('./src/middleware/cors');
-
-// Import routes
-const routes = require('./src/routes');
-const { sendEmployeeWelcomeEmail } = require('./src/services/email/employeeEmailService');
-
-// Create Express app
+// Create Express app first
 const app = express();
+
+// Safe module loading with error handling
+let config, logger, apiResponse, errorHandler, corsMiddleware, routes, sendEmployeeWelcomeEmail;
+
+try {
+  config = require('./config/environment');
+} catch (error) {
+  console.error('Failed to load config:', error.message);
+  config = { 
+    security: { helmetEnabled: true, cspEnabled: false, hstsEnabled: false },
+    performance: { compressionEnabled: true, compressionThreshold: 1024, jsonLimit: '10mb', urlEncodedLimit: '10mb' },
+    rateLimiting: { window: 15, maxRequests: 100, authWindow: 15, authMaxRequests: 5, passwordResetWindow: 60, passwordResetMaxRequests: 3 },
+    session: { secret: 'fallback-secret' },
+    swagger: { enabled: false },
+    features: { mockEmailEnabled: true },
+    app: { url: process.env.VERCEL_URL || 'https://your-app.vercel.app' }
+  };
+}
+
+try {
+  logger = require('./src/utils/logger');
+} catch (error) {
+  console.error('Failed to load logger:', error.message);
+  logger = { info: console.log, error: console.error, warn: console.warn };
+}
+
+try {
+  apiResponse = require('./src/utils/apiResponse');
+} catch (error) {
+  console.error('Failed to load apiResponse:', error.message);
+  apiResponse = {
+    success: (res, data, message) => res.json({ success: true, data, message }),
+    notFound: (res, data, message) => res.status(404).json({ success: false, data, message })
+  };
+}
+
+try {
+  errorHandler = require('./src/middleware/errorHandler');
+} catch (error) {
+  console.error('Failed to load errorHandler:', error.message);
+}
+
+try {
+  corsMiddleware = require('./src/middleware/cors');
+} catch (error) {
+  console.error('Failed to load corsMiddleware:', error.message);
+}
+
+try {
+  routes = require('./src/routes');
+} catch (error) {
+  console.error('Failed to load routes:', error.message);
+}
+
+try {
+  const emailService = require('./src/services/email/employeeEmailService');
+  sendEmployeeWelcomeEmail = emailService.sendEmployeeWelcomeEmail;
+} catch (error) {
+  console.error('Failed to load email service:', error.message);
+}
 
 // =============================================================================
 // TRUST PROXY (for production deployments behind reverse proxy)
@@ -76,7 +123,18 @@ if (config.security.helmetEnabled) {
 // =============================================================================
 // CORS CONFIGURATION
 // =============================================================================
-app.use(corsMiddleware.default);
+if (corsMiddleware && corsMiddleware.default) {
+  app.use(corsMiddleware.default);
+} else {
+  // Fallback CORS configuration
+  const cors = require('cors');
+  app.use(cors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  }));
+}
 
 // =============================================================================
 // RATE LIMITING
@@ -302,7 +360,20 @@ app.get('/api', (req, res) => {
 });
 
 // Mount all API routes
-app.use('/api', routes);
+if (routes) {
+  app.use('/api', routes);
+  logger.info('API routes mounted successfully');
+} else {
+  logger.warn('Routes module not available');
+  // Basic fallback route
+  app.get('/api', (req, res) => {
+    res.json({
+      success: false,
+      message: 'API routes not configured',
+      error: 'Routes module failed to load'
+    });
+  });
+}
 
 // =============================================================================
 // API DOCUMENTATION (Swagger)
@@ -339,6 +410,14 @@ app.get('/', (req, res) => {
 });
 
 app.get('/test-email', async (req, res) => {
+  if (!sendEmployeeWelcomeEmail) {
+    return res.status(503).json({
+      success: false,
+      message: 'Email service not available',
+      error: 'Email service module failed to load'
+    });
+  }
+
   const testEmp = {
     'firstName': 'Imran',
     'lastName': 'Pasha',
@@ -355,13 +434,16 @@ app.get('/test-email', async (req, res) => {
   };
   const token = 'xsq0JAFQ7MTW8cE4rR8zKpitjZjysOJSq5tDRFOcbKrPjD6w7vJ5R6BfF88RRpgu';
   try {
-    const test = sendEmployeeWelcomeEmail(testEmp, token);
+    const test = await sendEmployeeWelcomeEmail(testEmp, token);
     apiResponse.success(res, test);
-
   } catch (error) {
-    return res.status(500).json({ msg: 'something went wrong ❌', error });
+    logger.error('Test email error:', error);
+    return res.status(500).json({ 
+      success: false,
+      message: 'something went wrong ❌', 
+      error: error.message 
+    });
   }
-
 });
 // =============================================================================
 // 404 HANDLER
@@ -398,22 +480,6 @@ app.all('*', (req, res) => {
 // =============================================================================
 // ERROR HANDLING MIDDLEWARE
 // =============================================================================
-
-// Middleware to log incoming requests
-app.use((req, res, next) => {
-  console.log(`Incoming request: ${req.method} ${req.url}`);
-  next();
-});
-
-// Middleware to log unhandled errors
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({
-    success: false,
-    message: 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? err.message : 'An error occurred'
-  });
-});
 
 // Global error handler (must be last)
 app.use((err, req, res, next) => {
