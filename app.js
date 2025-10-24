@@ -29,9 +29,8 @@ const errorHandler = require('./src/middleware/errorHandler');
 const corsMiddleware = require('./src/middleware/cors');
 const authMiddleware = require('./src/middleware/auth');
 
-// Import existing routes
-const authRoutes = require('./src/routes/auth/authRoutes');
-const passwordRoutes = require('./src/routes/auth/passwordRoutes');
+// Import routes
+// const routes = require('./src/routes');
 
 // Create Express app
 const app = express();
@@ -39,9 +38,8 @@ const app = express();
 // =============================================================================
 // TRUST PROXY (for production deployments behind reverse proxy)
 // =============================================================================
-// Always trust proxy on Vercel or in production
-if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', true);
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
 }
 
 // =============================================================================
@@ -244,31 +242,29 @@ app.get('/api/health', async (req, res) => {
       nodeVersion: process.version
     },
     services: {
-      database: 'SKIP',
+      database: 'OK',
       email: config.features.mockEmailEnabled ? 'MOCK' : 'OK',
       fileStorage: 'OK'
     }
   };
 
-  // Skip database check on Vercel to prevent crashes
-  if (!process.env.VERCEL) {
-    try {
-      const { createConnectionPool, testDatabaseConnection } = require('./config/database');
-      const tempPool = createConnectionPool();
-      const result = await testDatabaseConnection(tempPool);
-      await tempPool.end();
+  // Test database connection
+  // Test database connection
+  try {
+    const { createConnectionPool, testDatabaseConnection } = require('./config/database');
+    const tempPool = createConnectionPool();
+    const result = await testDatabaseConnection(tempPool);
+    await tempPool.end();
 
-      healthCheck.services.database = result.success ? 'OK' : 'ERROR';
-      if (!result.success) {
-        healthCheck.status = 'DEGRADED';
-      }
-    } catch (error) {
-      healthCheck.services.database = 'ERROR';
+    healthCheck.services.database = result.success ? 'OK' : 'ERROR';
+    if (!result.success) {
       healthCheck.status = 'DEGRADED';
-      logger.error('Database health check failed:', error);
     }
+  } catch (error) {
+    healthCheck.services.database = 'ERROR';
+    healthCheck.status = 'DEGRADED';
+    logger.error('Database health check failed:', error);
   }
-  
   res.status(200).json(healthCheck);
 });
 
@@ -307,8 +303,7 @@ app.get('/api', (req, res) => {
 });
 
 // Mount all API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/auth/password', passwordRoutes);
+// app.use('/api', routes);
 
 // =============================================================================
 // API DOCUMENTATION (Swagger)
