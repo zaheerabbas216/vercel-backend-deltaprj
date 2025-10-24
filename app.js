@@ -400,7 +400,14 @@ app.all('*', (req, res) => {
 // =============================================================================
 
 // Global error handler (must be last)
-app.use(errorHandler.errorHandler);
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    success: false,
+    message: 'Internal server error',
+    error: process.env.NODE_ENV === 'development' ? err.message : 'An error occurred'
+  });
+});
 
 // =============================================================================
 // EXPORT APPLICATION
