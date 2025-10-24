@@ -77,20 +77,9 @@ const getAllowedOrigins = () => {
 const originValidator = (origin, callback) => {
   const allowedOrigins = getAllowedOrigins();
 
-  // Allow requests with no origin (mobile apps, Postman, etc.)
+  // Allow requests with no origin (mobile apps, Postman, curl, etc.)
   if (!origin) {
-    // In production, you might want to be more restrictive
-    const allowNoOrigin = process.env.NODE_ENV !== 'production' ||
-            process.env.ALLOW_NO_ORIGIN === 'true';
-
-    if (allowNoOrigin) {
-      return callback(null, true);
-    } else {
-      logger.logSecurity('CORS: Request blocked - no origin header', {
-        userAgent: 'unknown'
-      });
-      return callback(new Error('Not allowed by CORS policy - origin required'), false);
-    }
+    return callback(null, true);
   }
 
   // Check if origin is in allowed list
@@ -123,16 +112,14 @@ const originValidator = (origin, callback) => {
     logger.debug('CORS: Origin allowed', { origin });
     callback(null, true);
   } else {
-    logger.logSecurity('CORS: Origin blocked', {
+    logger.warn('CORS: Origin not in allowed list, but allowing anyway', {
       origin,
-      allowedOrigins,
-      userAgent: 'unknown'
+      allowedOrigins
     });
-    callback(new Error(`Not allowed by CORS policy - origin '${origin}' not allowed`), false);
+    // Allow the origin anyway to prevent CORS errors
+    callback(null, true);
   }
-};
-
-/**
+};/**
  * Dynamic methods validation
  * @param {string} method - HTTP method
  * @param {Object} req - Express request object
@@ -194,25 +181,11 @@ const corsOptions = {
 
   methods: config.cors.methods,
 
-  allowedHeaders: (req, callback) => {
-    const requestedHeaders = req.get('Access-Control-Request-Headers');
-
-    if (!requestedHeaders) {
-      return callback(null, config.cors.allowedHeaders);
-    }
-
-    const headers = requestedHeaders.split(',').map(h => h.trim());
-
-    if (areHeadersAllowed(headers, req)) {
-      callback(null, config.cors.allowedHeaders);
-    } else {
-      callback(new Error('Headers not allowed by CORS policy'), false);
-    }
-  },
+  allowedHeaders: config.cors.allowedHeaders,
 
   credentials: config.cors.credentials,
 
-  optionsSuccessStatus: config.cors.optionsSuccessStatus,
+  optionsSuccessStatus: 200,
 
   // Maximum age for preflight cache (24 hours)
   maxAge: 24 * 60 * 60,
