@@ -25,6 +25,10 @@ const getDefaultOrigins = () => {
     case 'production':
       return [
         config.frontend.url,
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:5173',
         'https://yourdomain.com',
         'https://www.yourdomain.com',
         'https://api.yourdomain.com'
@@ -33,6 +37,7 @@ const getDefaultOrigins = () => {
     case 'staging':
       return [
         config.frontend.url,
+        'http://localhost:5173',
         'https://staging.yourdomain.com',
         'https://staging-api.yourdomain.com'
       ];
@@ -42,8 +47,10 @@ const getDefaultOrigins = () => {
       return [
         'http://localhost:3000',
         'http://localhost:3001',
+        'http://localhost:5173',
         'http://127.0.0.1:3000',
         'http://127.0.0.1:3001',
+        'http://127.0.0.1:5173',
         config.frontend.url
       ];
   }
