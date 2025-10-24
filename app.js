@@ -244,29 +244,31 @@ app.get('/api/health', async (req, res) => {
       nodeVersion: process.version
     },
     services: {
-      database: 'OK',
+      database: 'SKIP',
       email: config.features.mockEmailEnabled ? 'MOCK' : 'OK',
       fileStorage: 'OK'
     }
   };
 
-  // Test database connection
-  // Test database connection
-  try {
-    const { createConnectionPool, testDatabaseConnection } = require('./config/database');
-    const tempPool = createConnectionPool();
-    const result = await testDatabaseConnection(tempPool);
-    await tempPool.end();
+  // Skip database check on Vercel to prevent crashes
+  if (!process.env.VERCEL) {
+    try {
+      const { createConnectionPool, testDatabaseConnection } = require('./config/database');
+      const tempPool = createConnectionPool();
+      const result = await testDatabaseConnection(tempPool);
+      await tempPool.end();
 
-    healthCheck.services.database = result.success ? 'OK' : 'ERROR';
-    if (!result.success) {
+      healthCheck.services.database = result.success ? 'OK' : 'ERROR';
+      if (!result.success) {
+        healthCheck.status = 'DEGRADED';
+      }
+    } catch (error) {
+      healthCheck.services.database = 'ERROR';
       healthCheck.status = 'DEGRADED';
+      logger.error('Database health check failed:', error);
     }
-  } catch (error) {
-    healthCheck.services.database = 'ERROR';
-    healthCheck.status = 'DEGRADED';
-    logger.error('Database health check failed:', error);
   }
+  
   res.status(200).json(healthCheck);
 });
 
