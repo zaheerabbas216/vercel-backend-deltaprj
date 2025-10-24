@@ -392,6 +392,16 @@ app.get('/api', (req, res) => {
 });
 
 // Mount all API routes
+// Add a simple inline test route first
+app.post('/api/auth/login', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Login endpoint reached (inline test)',
+    body: req.body,
+    timestamp: new Date().toISOString()
+  });
+});
+
 if (authRoutes) {
   app.use('/api/auth', authRoutes);
   console.log('✅ Mounted /api/auth routes');
