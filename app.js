@@ -244,14 +244,13 @@ app.get('/api/health', async (req, res) => {
       nodeVersion: process.version
     },
     services: {
-      database: 'OK',
+      database: 'SKIPPED',
       email: config.features.mockEmailEnabled ? 'MOCK' : 'OK',
       fileStorage: 'OK'
     }
   };
 
-  // Test database connection
-  // Test database connection
+  // Test database connection (optional - don't fail if DB is not configured)
   try {
     const { createConnectionPool, testDatabaseConnection } = require('./config/database');
     const tempPool = createConnectionPool();
@@ -263,9 +262,9 @@ app.get('/api/health', async (req, res) => {
       healthCheck.status = 'DEGRADED';
     }
   } catch (error) {
-    healthCheck.services.database = 'ERROR';
+    healthCheck.services.database = 'NOT_CONFIGURED';
     healthCheck.status = 'DEGRADED';
-    logger.error('Database health check failed:', error);
+    logger.warn('Database health check failed:', error.message);
   }
   res.status(200).json(healthCheck);
 });

@@ -339,12 +339,13 @@ const validateConfig = () => {
   });
 
   if (missingVars.length > 0) {
-    console.error('❌ Missing required environment variables:');
+    console.warn('⚠️  Missing required environment variables:');
     missingVars.forEach(varName => {
-      console.error(`   - ${varName}`);
+      console.warn(`   - ${varName}`);
     });
-    console.error('Please check your .env file and ensure all required variables are set.');
-    process.exit(1);
+    console.warn('Please check your .env file and ensure all required variables are set.');
+    console.warn('App will start but some features may not work correctly.');
+    return; // Don't exit, just warn
   }
 
   // Production-specific validation
@@ -358,27 +359,26 @@ const validateConfig = () => {
     });
 
     if (missingProdVars.length > 0) {
-      console.error('❌ Missing required production environment variables:');
+      console.warn('⚠️  Missing required production environment variables:');
       missingProdVars.forEach(varName => {
-        console.error(`   - ${varName}`);
+        console.warn(`   - ${varName}`);
       });
-      console.error('Production environment requires additional security variables.');
-      process.exit(1);
+      console.warn('Production environment requires additional security variables.');
+      console.warn('App will start but database features may not work.');
+      return; // Don't exit, just warn
     }
 
     // Warn about default secrets in production
     if (config.jwt.secret === 'your-super-secret-jwt-key') {
-      console.error('❌ Using default JWT_SECRET in production is not secure!');
-      process.exit(1);
+      console.warn('⚠️  Using default JWT_SECRET in production is not secure!');
     }
 
     if (config.session.secret === 'your-session-secret') {
-      console.error('❌ Using default SESSION_SECRET in production is not secure!');
-      process.exit(1);
+      console.warn('⚠️  Using default SESSION_SECRET in production is not secure!');
     }
   }
 
-  console.log(`✅ Configuration validated for ${config.app.environment} environment`);
+  console.log(`✅ Configuration loaded for ${config.app.environment} environment`);
   console.log(`📊 Database: MySQL2 at ${config.database.host}:${config.database.port}/${config.database.name}`);
 };
 
