@@ -399,6 +399,22 @@ app.all('*', (req, res) => {
 // ERROR HANDLING MIDDLEWARE
 // =============================================================================
 
+// Middleware to log incoming requests
+app.use((req, res, next) => {
+  console.log(`Incoming request: ${req.method} ${req.url}`);
+  next();
+});
+
+// Middleware to log unhandled errors
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    success: false,
+    message: 'Internal server error',
+    error: process.env.NODE_ENV === 'development' ? err.message : 'An error occurred'
+  });
+});
+
 // Global error handler (must be last)
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
