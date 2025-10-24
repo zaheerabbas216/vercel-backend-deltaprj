@@ -38,8 +38,9 @@ const app = express();
 // =============================================================================
 // TRUST PROXY (for production deployments behind reverse proxy)
 // =============================================================================
-if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1);
+// Always trust proxy on Vercel or in production
+if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', true);
 }
 
 // =============================================================================
