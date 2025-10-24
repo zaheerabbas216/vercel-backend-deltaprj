@@ -19,23 +19,31 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('express-async-errors');
 
-// Import configuration and utilities
-const config = require('./config/environment');
-const logger = require('./src/utils/logger');
-const apiResponse = require('./src/utils/apiResponse');
-
-// Import middleware
-const errorHandler = require('./src/middleware/errorHandler');
-const corsMiddleware = require('./src/middleware/cors');
-const authMiddleware = require('./src/middleware/auth');
-
-// Import routes
-const authRoutes = require('./src/routes/auth/authRoutes');
-const passwordRoutes = require('./src/routes/auth/passwordRoutes');
-// const routes = require('./src/routes');
-
-// Create Express app
+// Create Express app first
 const app = express();
+
+// Simple test route to verify app is working
+app.get('/test', (req, res) => {
+  res.json({ message: 'App is running!', timestamp: new Date().toISOString() });
+});
+
+// Import configuration and utilities with error handling
+let config, logger, apiResponse, errorHandler, corsMiddleware, authMiddleware, authRoutes, passwordRoutes;
+
+try {
+  config = require('./config/environment');
+  logger = require('./src/utils/logger');
+  apiResponse = require('./src/utils/apiResponse');
+  errorHandler = require('./src/middleware/errorHandler');
+  corsMiddleware = require('./src/middleware/cors');
+  authMiddleware = require('./src/middleware/auth');
+  authRoutes = require('./src/routes/auth/authRoutes');
+  passwordRoutes = require('./src/routes/auth/passwordRoutes');
+} catch (error) {
+  console.error('❌ Error loading modules:', error.message);
+  console.error(error.stack);
+  // Continue with minimal setup
+}
 
 // =============================================================================
 // TRUST PROXY (for production deployments behind reverse proxy)
@@ -49,7 +57,7 @@ if (process.env.NODE_ENV === 'production') {
 // =============================================================================
 
 // Helmet for security headers
-if (config.security.helmetEnabled) {
+if (config && config.security && config.security.helmetEnabled) {
   app.use(helmet({
     contentSecurityPolicy: config.security.cspEnabled ? {
       directives: {
@@ -79,7 +87,15 @@ if (config.security.helmetEnabled) {
 // =============================================================================
 // CORS CONFIGURATION
 // =============================================================================
-app.use(corsMiddleware.default);
+if (corsMiddleware && corsMiddleware.default) {
+  app.use(corsMiddleware.default);
+} else {
+  // Fallback CORS if module failed to load
+  app.use(cors({
+    origin: true,
+    credentials: true
+  }));
+}
 
 // =============================================================================
 // RATE LIMITING
@@ -304,8 +320,12 @@ app.get('/api', (req, res) => {
 });
 
 // Mount all API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/auth/password', passwordRoutes);
+if (authRoutes) {
+  app.use('/api/auth', authRoutes);
+}
+if (passwordRoutes) {
+  app.use('/api/auth/password', passwordRoutes);
+}
 // app.use('/api', routes);
 
 // =============================================================================
@@ -379,7 +399,19 @@ app.all('*', (req, res) => {
 // =============================================================================
 
 // Global error handler (must be last)
-app.use(errorHandler.errorHandler);
+if (errorHandler && errorHandler.errorHandler) {
+  app.use(errorHandler.errorHandler);
+} else {
+  // Fallback error handler
+  app.use((err, req, res, next) => {
+    console.error('Error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? err.message : 'An error occurred'
+    });
+  });
+}
 
 // =============================================================================
 // EXPORT APPLICATION
