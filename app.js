@@ -391,20 +391,18 @@ app.get('/api', (req, res) => {
   }
 });
 
-// Mount all API routes
-if (authRoutes) {
-  app.use('/api/auth', authRoutes);
-  console.log('✅ Mounted /api/auth routes');
-} else {
-  console.error('❌ Auth routes not available - skipping');
-}
-if (passwordRoutes) {
-  app.use('/api/auth/password', passwordRoutes);
-  console.log('✅ Mounted /api/auth/password routes');
-} else {
-  console.error('❌ Password routes not available - skipping');
-}
-// app.use('/api', routes);
+// =============================================================================
+// ROOT ENDPOINT
+// =============================================================================
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Delta-2 Backend API',
+    version: require('./package.json').version,
+    status: 'Running',
+    documentation: `${config.app.url}/api-docs`,
+    health: `${config.app.url}/health`
+  });
+});
 
 // =============================================================================
 // API DOCUMENTATION (Swagger)
@@ -428,20 +426,25 @@ if (config.swagger.enabled) {
 }
 
 // =============================================================================
-// ROOT ENDPOINT
+// API ROUTES
 // =============================================================================
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Delta-2 Backend API',
-    version: require('./package.json').version,
-    status: 'Running',
-    documentation: `${config.app.url}/api-docs`,
-    health: `${config.app.url}/health`
-  });
-});
+// Mount all API routes
+if (authRoutes) {
+  app.use('/api/auth', authRoutes);
+  console.log('✅ Mounted /api/auth routes');
+} else {
+  console.error('❌ Auth routes not available - skipping');
+}
+if (passwordRoutes) {
+  app.use('/api/auth/password', passwordRoutes);
+  console.log('✅ Mounted /api/auth/password routes');
+} else {
+  console.error('❌ Password routes not available - skipping');
+}
+// app.use('/api', routes);
 
 // =============================================================================
-// 404 HANDLER
+// 404 HANDLER (Must be after all routes!)
 // =============================================================================
 app.all('*', (req, res) => {
   logger.warn(`404 - Route not found: ${req.method} ${req.originalUrl}`);
