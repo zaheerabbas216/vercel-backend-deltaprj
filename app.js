@@ -27,22 +27,94 @@ app.get('/test', (req, res) => {
   res.json({ message: 'App is running!', timestamp: new Date().toISOString() });
 });
 
+// Debug route to show all registered routes
+app.get('/debug/routes', (req, res) => {
+  const routes = [];
+  app._router.stack.forEach((middleware) => {
+    if (middleware.route) {
+      routes.push({
+        path: middleware.route.path,
+        methods: Object.keys(middleware.route.methods)
+      });
+    } else if (middleware.name === 'router') {
+      middleware.handle.stack.forEach((handler) => {
+        if (handler.route) {
+          routes.push({
+            path: handler.route.path,
+            methods: Object.keys(handler.route.methods)
+          });
+        }
+      });
+    }
+  });
+  res.json({
+    message: 'Registered routes',
+    count: routes.length,
+    routes,
+    authRoutesLoaded: !!authRoutes,
+    passwordRoutesLoaded: !!passwordRoutes
+  });
+});
+
 // Import configuration and utilities with error handling
 let config, logger, apiResponse, errorHandler, corsMiddleware, authMiddleware, authRoutes, passwordRoutes;
 
 try {
   config = require('./config/environment');
-  logger = require('./src/utils/logger');
-  apiResponse = require('./src/utils/apiResponse');
-  errorHandler = require('./src/middleware/errorHandler');
-  corsMiddleware = require('./src/middleware/cors');
-  authMiddleware = require('./src/middleware/auth');
-  authRoutes = require('./src/routes/auth/authRoutes');
-  passwordRoutes = require('./src/routes/auth/passwordRoutes');
+  console.log('✅ Config loaded');
 } catch (error) {
-  console.error('❌ Error loading modules:', error.message);
+  console.error('❌ Error loading config:', error.message);
+}
+
+try {
+  logger = require('./src/utils/logger');
+  console.log('✅ Logger loaded');
+} catch (error) {
+  console.error('❌ Error loading logger:', error.message);
+}
+
+try {
+  apiResponse = require('./src/utils/apiResponse');
+  console.log('✅ API Response loaded');
+} catch (error) {
+  console.error('❌ Error loading apiResponse:', error.message);
+}
+
+try {
+  errorHandler = require('./src/middleware/errorHandler');
+  console.log('✅ Error handler loaded');
+} catch (error) {
+  console.error('❌ Error loading errorHandler:', error.message);
+}
+
+try {
+  corsMiddleware = require('./src/middleware/cors');
+  console.log('✅ CORS middleware loaded');
+} catch (error) {
+  console.error('❌ Error loading corsMiddleware:', error.message);
+}
+
+try {
+  authMiddleware = require('./src/middleware/auth');
+  console.log('✅ Auth middleware loaded');
+} catch (error) {
+  console.error('❌ Error loading authMiddleware:', error.message);
+}
+
+try {
+  authRoutes = require('./src/routes/auth/authRoutes');
+  console.log('✅ Auth routes loaded');
+} catch (error) {
+  console.error('❌ Error loading authRoutes:', error.message);
   console.error(error.stack);
-  // Continue with minimal setup
+}
+
+try {
+  passwordRoutes = require('./src/routes/auth/passwordRoutes');
+  console.log('✅ Password routes loaded');
+} catch (error) {
+  console.error('❌ Error loading passwordRoutes:', error.message);
+  console.error(error.stack);
 }
 
 // =============================================================================
@@ -322,9 +394,15 @@ app.get('/api', (req, res) => {
 // Mount all API routes
 if (authRoutes) {
   app.use('/api/auth', authRoutes);
+  console.log('✅ Mounted /api/auth routes');
+} else {
+  console.error('❌ Auth routes not available - skipping');
 }
 if (passwordRoutes) {
   app.use('/api/auth/password', passwordRoutes);
+  console.log('✅ Mounted /api/auth/password routes');
+} else {
+  console.error('❌ Password routes not available - skipping');
 }
 // app.use('/api', routes);
 
