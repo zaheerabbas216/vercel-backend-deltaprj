@@ -29,8 +29,9 @@ const errorHandler = require('./src/middleware/errorHandler');
 const corsMiddleware = require('./src/middleware/cors');
 const authMiddleware = require('./src/middleware/auth');
 
-// Import routes
-// const routes = require('./src/routes');
+// Import existing routes
+const authRoutes = require('./src/routes/auth/authRoutes');
+const passwordRoutes = require('./src/routes/auth/passwordRoutes');
 
 // Create Express app
 const app = express();
@@ -304,7 +305,8 @@ app.get('/api', (req, res) => {
 });
 
 // Mount all API routes
-// app.use('/api', routes);
+app.use('/api/auth', authRoutes);
+app.use('/api/auth/password', passwordRoutes);
 
 // =============================================================================
 // API DOCUMENTATION (Swagger)
