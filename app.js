@@ -30,6 +30,7 @@ const corsMiddleware = require('./src/middleware/cors');
 const authMiddleware = require('./src/middleware/auth');
 
 // Import routes
+const authRoutes = require('./src/routes/auth/authRoutes');
 // const routes = require('./src/routes');
 
 // Create Express app
@@ -303,6 +304,7 @@ app.get('/api', (req, res) => {
 });
 
 // Mount all API routes
+app.use('/api/auth', authRoutes);
 // app.use('/api', routes);
 
 // =============================================================================
