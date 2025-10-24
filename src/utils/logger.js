@@ -19,7 +19,7 @@ const config = {
   level: process.env.LOG_LEVEL || 'info',
   enableFile: process.env.LOG_FILE === 'true',
   enableConsole: process.env.LOG_CONSOLE !== 'false',
-  logDir: process.env.LOG_DIR || './storage/logs',
+  logDir: process.env.LOG_DIR || (process.env.VERCEL ? '/tmp/logs' : './storage/logs'),
   maxSize: process.env.LOG_MAX_SIZE || '20m',
   maxFiles: process.env.LOG_MAX_FILES || '14d',
   datePattern: process.env.LOG_DATE_PATTERN || 'YYYY-MM-DD'
