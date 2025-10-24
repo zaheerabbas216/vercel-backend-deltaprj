@@ -1,15 +1,14 @@
 /**
- * Delta-2 Backend Express Application Configuration
+ * Delta Backend Express Application Configuration
  *
  * This file configures the Express.js application with all necessary
- * middleware, routes, and error handling for the Delta-2 Backend API.
- *just testing here
- * @author Delta-2 Development Team
+ * middleware, routes, and error handling for the Delta Backend API.
+ *
+ * @author Delta Development Team
  * @version 1.0.0
  */
 
 const express = require('express');
-const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
@@ -19,103 +18,21 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('express-async-errors');
 
-// Create Express app first
+// Import configuration and utilities
+const config = require('./config/environment');
+const logger = require('./src/utils/logger');
+const apiResponse = require('./src/utils/apiResponse');
+
+// Import middleware
+const errorHandler = require('./src/middleware/errorHandler');
+const corsMiddleware = require('./src/middleware/cors');
+
+// Import routes
+const routes = require('./src/routes');
+const { sendEmployeeWelcomeEmail } = require('./src/services/email/employeeEmailService');
+
+// Create Express app
 const app = express();
-
-// Simple test route to verify app is working
-app.get('/test', (req, res) => {
-  res.json({ message: 'App is running!', timestamp: new Date().toISOString() });
-});
-
-// Debug route to show all registered routes
-app.get('/debug/routes', (req, res) => {
-  const routes = [];
-  app._router.stack.forEach((middleware) => {
-    if (middleware.route) {
-      routes.push({
-        path: middleware.route.path,
-        methods: Object.keys(middleware.route.methods)
-      });
-    } else if (middleware.name === 'router') {
-      middleware.handle.stack.forEach((handler) => {
-        if (handler.route) {
-          routes.push({
-            path: handler.route.path,
-            methods: Object.keys(handler.route.methods)
-          });
-        }
-      });
-    }
-  });
-  res.json({
-    message: 'Registered routes',
-    count: routes.length,
-    routes,
-    authRoutesLoaded: !!authRoutes,
-    passwordRoutesLoaded: !!passwordRoutes
-  });
-});
-
-// Import configuration and utilities with error handling
-let config, logger, apiResponse, errorHandler, corsMiddleware, authMiddleware, authRoutes, passwordRoutes;
-
-try {
-  config = require('./config/environment');
-  console.log('✅ Config loaded');
-} catch (error) {
-  console.error('❌ Error loading config:', error.message);
-}
-
-try {
-  logger = require('./src/utils/logger');
-  console.log('✅ Logger loaded');
-} catch (error) {
-  console.error('❌ Error loading logger:', error.message);
-}
-
-try {
-  apiResponse = require('./src/utils/apiResponse');
-  console.log('✅ API Response loaded');
-} catch (error) {
-  console.error('❌ Error loading apiResponse:', error.message);
-}
-
-try {
-  errorHandler = require('./src/middleware/errorHandler');
-  console.log('✅ Error handler loaded');
-} catch (error) {
-  console.error('❌ Error loading errorHandler:', error.message);
-}
-
-try {
-  corsMiddleware = require('./src/middleware/cors');
-  console.log('✅ CORS middleware loaded');
-} catch (error) {
-  console.error('❌ Error loading corsMiddleware:', error.message);
-}
-
-try {
-  authMiddleware = require('./src/middleware/auth');
-  console.log('✅ Auth middleware loaded');
-} catch (error) {
-  console.error('❌ Error loading authMiddleware:', error.message);
-}
-
-try {
-  authRoutes = require('./src/routes/auth/authRoutes');
-  console.log('✅ Auth routes loaded');
-} catch (error) {
-  console.error('❌ Error loading authRoutes:', error.message);
-  console.error(error.stack);
-}
-
-try {
-  passwordRoutes = require('./src/routes/auth/passwordRoutes');
-  console.log('✅ Password routes loaded');
-} catch (error) {
-  console.error('❌ Error loading passwordRoutes:', error.message);
-  console.error(error.stack);
-}
 
 // =============================================================================
 // TRUST PROXY (for production deployments behind reverse proxy)
@@ -129,7 +46,7 @@ if (process.env.NODE_ENV === 'production') {
 // =============================================================================
 
 // Helmet for security headers
-if (config && config.security && config.security.helmetEnabled) {
+if (config.security.helmetEnabled) {
   app.use(helmet({
     contentSecurityPolicy: config.security.cspEnabled ? {
       directives: {
@@ -159,15 +76,7 @@ if (config && config.security && config.security.helmetEnabled) {
 // =============================================================================
 // CORS CONFIGURATION
 // =============================================================================
-if (corsMiddleware && corsMiddleware.default) {
-  app.use(corsMiddleware.default);
-} else {
-  // Fallback CORS if module failed to load
-  app.use(cors({
-    origin: true,
-    credentials: true
-  }));
-}
+app.use(corsMiddleware.default);
 
 // =============================================================================
 // RATE LIMITING
@@ -255,7 +164,7 @@ if (process.env.NODE_ENV === 'development') {
     stream: {
       write: (message) => logger.info(message.trim())
     },
-    skip: (req, res) => {
+    skip: (req) => {
       // Skip logging for health checks in production
       return req.path === '/health' || req.path === '/api/health';
     }
@@ -332,13 +241,14 @@ app.get('/api/health', async (req, res) => {
       nodeVersion: process.version
     },
     services: {
-      database: 'SKIPPED',
+      database: 'OK',
       email: config.features.mockEmailEnabled ? 'MOCK' : 'OK',
       fileStorage: 'OK'
     }
   };
 
-  // Test database connection (optional - don't fail if DB is not configured)
+  // Test database connection
+  // Test database connection
   try {
     const { createConnectionPool, testDatabaseConnection } = require('./config/database');
     const tempPool = createConnectionPool();
@@ -350,9 +260,9 @@ app.get('/api/health', async (req, res) => {
       healthCheck.status = 'DEGRADED';
     }
   } catch (error) {
-    healthCheck.services.database = 'NOT_CONFIGURED';
+    healthCheck.services.database = 'ERROR';
     healthCheck.status = 'DEGRADED';
-    logger.warn('Database health check failed:', error.message);
+    logger.error('Database health check failed:', error);
   }
   res.status(200).json(healthCheck);
 });
@@ -365,7 +275,7 @@ app.get('/api/health', async (req, res) => {
 app.get('/api', (req, res) => {
   const responseData = {
     success: true,
-    message: 'Welcome to Delta-2 Backend API',
+    message: 'Welcome to Delta Backend API',
     data: {
       version: require('./package.json').version,
       environment: process.env.NODE_ENV,
@@ -391,18 +301,8 @@ app.get('/api', (req, res) => {
   }
 });
 
-// =============================================================================
-// ROOT ENDPOINT
-// =============================================================================
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Delta-2 Backend API',
-    version: require('./package.json').version,
-    status: 'Running',
-    documentation: `${config.app.url}/api-docs`,
-    health: `${config.app.url}/health`
-  });
-});
+// Mount all API routes
+app.use('/api', routes);
 
 // =============================================================================
 // API DOCUMENTATION (Swagger)
@@ -426,25 +326,45 @@ if (config.swagger.enabled) {
 }
 
 // =============================================================================
-// API ROUTES
+// ROOT ENDPOINT
 // =============================================================================
-// Mount all API routes
-if (authRoutes) {
-  app.use('/api/auth', authRoutes);
-  console.log('✅ Mounted /api/auth routes');
-} else {
-  console.error('❌ Auth routes not available - skipping');
-}
-if (passwordRoutes) {
-  app.use('/api/auth/password', passwordRoutes);
-  console.log('✅ Mounted /api/auth/password routes');
-} else {
-  console.error('❌ Password routes not available - skipping');
-}
-// app.use('/api', routes);
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Delta Backend API',
+    version: require('./package.json').version,
+    status: 'Running',
+    documentation: `${config.app.url}/api-docs`,
+    health: `${config.app.url}/health`
+  });
+});
 
+app.get('/test-email', async (req, res) => {
+  const testEmp = {
+    'firstName': 'Imran',
+    'lastName': 'Pasha',
+    'email': 'theoryofbetter@gmail.com',
+    'username': 'imran.pasha',
+    'tempPassword': 'P@ssw0rd!A1',
+    'department': 'Product Management',
+    'position': 'Product Manager',
+    'managerName': 'Sonal Mehra',
+    'managerEmail': 'sonal.mehra@company.com',
+    'startDate': '2025-10-20',
+    'orientationDate': '2025-10-21',
+    'orientationTime': '10:00 AM'
+  };
+  const token = 'xsq0JAFQ7MTW8cE4rR8zKpitjZjysOJSq5tDRFOcbKrPjD6w7vJ5R6BfF88RRpgu';
+  try {
+    const test = sendEmployeeWelcomeEmail(testEmp, token);
+    apiResponse.success(res, test);
+
+  } catch (error) {
+    return res.status(500).json({ msg: 'something went wrong ❌', error });
+  }
+
+});
 // =============================================================================
-// 404 HANDLER (Must be after all routes!)
+// 404 HANDLER
 // =============================================================================
 app.all('*', (req, res) => {
   logger.warn(`404 - Route not found: ${req.method} ${req.originalUrl}`);
@@ -480,19 +400,7 @@ app.all('*', (req, res) => {
 // =============================================================================
 
 // Global error handler (must be last)
-if (errorHandler && errorHandler.errorHandler) {
-  app.use(errorHandler.errorHandler);
-} else {
-  // Fallback error handler
-  app.use((err, req, res, next) => {
-    console.error('Error:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-      error: process.env.NODE_ENV === 'development' ? err.message : 'An error occurred'
-    });
-  });
-}
+app.use(errorHandler.errorHandler);
 
 // =============================================================================
 // EXPORT APPLICATION
