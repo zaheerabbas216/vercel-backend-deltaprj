@@ -17,7 +17,7 @@ require('dotenv').config();
 // Configuration
 const config = {
   level: process.env.LOG_LEVEL || 'info',
-  enableFile: process.env.LOG_FILE === 'true',
+  enableFile: process.env.LOG_FILE === 'true' && (!process.env.VERCEL || (process.env.VERCEL && (process.env.LOG_DIR === '/tmp/logs' || (!process.env.LOG_DIR && process.env.VERCEL)))),
   enableConsole: process.env.LOG_CONSOLE !== 'false',
   logDir: process.env.LOG_DIR || (process.env.VERCEL ? '/tmp/logs' : './storage/logs'),
   maxSize: process.env.LOG_MAX_SIZE || '20m',
