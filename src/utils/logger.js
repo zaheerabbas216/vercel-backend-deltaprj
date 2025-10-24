@@ -25,9 +25,13 @@ const config = {
   datePattern: process.env.LOG_DATE_PATTERN || 'YYYY-MM-DD'
 };
 
-// Ensure log directory exists
-if (!fs.existsSync(config.logDir)) {
-  fs.mkdirSync(config.logDir, { recursive: true });
+// Ensure log directory exists only if file logging is enabled
+if (config.enableFile && !fs.existsSync(config.logDir)) {
+  try {
+    fs.mkdirSync(config.logDir, { recursive: true });
+  } catch (error) {
+    console.error('Failed to create log directory:', error.message);
+  }
 }
 
 // Custom log levels
